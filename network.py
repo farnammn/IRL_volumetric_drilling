@@ -74,34 +74,9 @@ class ConvolutionalBody(nn.Module):
 class VolumetricValueNet(nn.Module):
     def __init__(self, config):
         super(VolumetricValueNet, self).__init__()
-        self.l_img_body = ConvolutionalBody(config.img_dim, config.convolutional_hidden_units, config.convlutional_kernels,
-                                       config.convlutional_strides, config.convlutional_padings, config.pooling_layer,
-                                       config.pooling_kernels, config.pool_strides, gate=config.convlutional_gate)
-        self.r_img_body = ConvolutionalBody(config.img_dim, config.convolutional_hidden_units, config.convlutional_kernels,
-                                       config.convlutional_strides, config.convlutional_padings, config.pooling_layer,
-                                       config.pooling_kernels, config.pool_strides, gate=config.convlutional_gate)
-        self.depth_body = ConvolutionalBody(config.img_dim, config.convolutional_hidden_units, config.convlutional_kernels,
-                                       config.convlutional_strides, config.convlutional_padings, config.pooling_layer,
-                                       config.pooling_kernels, config.pool_strides, gate=config.convlutional_gate)
-        self.segm_body = ConvolutionalBody(config.img_dim, config.convolutional_hidden_units, config.convlutional_kernels,
-                                      config.convlutional_strides, config.convlutional_padings, config.pooling_layer,
-                                      config.pooling_kernels, config.pool_strides, gate=config.convlutional_gate)
-        self.voxel_removed_body = ConvolutionalBody(config.img_dim, config.convolutional_hidden_units, config.convlutional_kernels,
-                                      config.convlutional_strides, config.convlutional_padings, config.pooling_layer,
-                                      config.pooling_kernels, config.pool_strides, gate=config.convlutional_gate)
-        self.voxel_color_body = ConvolutionalBody(config.img_dim, config.convolutional_hidden_units, config.convlutional_kernels,
-                                      config.convlutional_strides, config.convlutional_padings, config.pooling_layer,
-                                      config.pooling_kernels, config.pool_strides, gate=config.convlutional_gate)
 
-        self.pose_cam_body = FCBody(config.pose_cam_dim, config.FC_hidden_units, gate=config.FC_gate)
-        self.pose_drill_body = FCBody(config.pose_drill_dim, config.FC_hidden_units, gate=config.FC_gate)
+        self.fc_l_img = FCBody(config.state_dim + config.action_dim, config.img_FC_hidden_units + (1,))
 
-        self.fc_l_img = FCBody(torch.prod(self.l_img_body.feature_dim), config.img_FC_hidden_units)
-        self.fc_r_img = FCBody(torch.prod(self.r_img_body.feature_dim), config.img_FC_hidden_units)
-        self.fc_depth = FCBody(torch.prod(self.depth_body.feature_dim), config.img_FC_hidden_units)
-        self.fc_segm = FCBody(torch.prod(self.segm_body.feature_dim), config.img_FC_hidden_units)
-        self.fc_voxel_removed = FCBody(torch.prod(self.voxel_removed_body.feature_dim), config.img_FC_hidden_units)
-        self.fc_voxel_color = FCBody(torch.prod(self.voxel_color_body.feature_dim), config.img_FC_hidden_units)
 
         self.fc = nn.Linear(config.state_presentation_dim + config.action_dim, config.N)
 

@@ -20,19 +20,22 @@ def pose_to_matrix(pose):
     return tau
 
 class DataSet:
-    def __init__(self, files_list, image_compression_dim, images_dim=(480, 640, 3), init_trajectory="./data/", batch_size=64):
-        random.shuffle(files_list)
+    def __init__(self, files_list, config):
+        self.image_dim = config.images_dim
         self.files_list = files_list
-        self.init_trajectory = init_trajectory
-        self.batch_size = batch_size
+        self.init_trajectory = config.init_trajectory
+        self.batch_size = config.batch_size
         self.file_index = 0
         self.data_index = 0
         self.N = len(self.files_list)
-        self.data_states = {}
-        self.data_actions = {}
-        self.state_keys = ["l_img", "r_img", "depth", "segm", "pose_cam", "pose_drill"]
-        self.image_compression_dim = image_compression_dim
-
+        self.data = {}
+        # self.state_keys = ["l_img", "r_img", "depth", "segm", "pose_cam", "pose_drill"]
+        self.image_compression_dim = config.image_compression_dim
+        self.num_colors = 5
+        self.color_dict = []
+        self.color_idx = -1
+        self.reward_map = config.reward_map
+        self.reward_list = [1, 2, 3, 4, 5]
 
     def plot(self, l_img, r_img, depth, segm):
         plt.subplot(221)
@@ -47,75 +50,93 @@ class DataSet:
         plt.show()
 
 
-    def preprocess(self, file_name):
+    def process_file(self, file_name):
         file = h5py.File(self.init_trajectory + file_name, 'r')
 
         # print(list(file['data']["l_img"][()]))
         if "data" in file.keys() and "metadata" in file.keys() and "voxels_removed" in file.keys():
             if "l_img" in file["data"].keys():
-                extrinsic = file['metadata']['camera_extrinsic'][()]
-                pose_cam = pose_to_matrix(file['data']['pose_main_camera'][()])
-                pose_cam = np.matmul(pose_cam, np.linalg.inv(extrinsic)[None])
+                # extrinsic = file['metadata']['camera_extrinsic'][()]
+                # pose_cam = pose_to_matrix(file['data']['pose_main_camera'][()])
+                # pose_cam = np.matmul(pose_cam, np.linalg.inv(extrinsic)[None])
+                # pose_cam = pose_cam.reshape(pose_cam.shape[0], -1)
+                pose_drill = pose_to_matrix(file['data']['pose_mastoidectomy_drill'][()])
+                print(file['data']['pose_mastoidectomy_drill'][()][0])
+                pose_drill = pose_drill.reshape(pose_drill.shape[0], -1)
+                print(pose_drill[0])
                 time = file["data"]["time"][()]
                 l_img = file["data"]["l_img"][()]
-                print(self.pca(l_img)[1])
                 r_img = file["data"]["r_img"][()]
                 depth = file["data"]["depth"][()]
+                depth = depth.reshape(depth.shape + (1,))
                 segm = file["data"]["segm"][()]
-                pose_drill = pose_to_matrix(file['data']['pose_mastoidectomy_drill'][()])
-                print(l_img[0].shape)
-                print(depth[0].shape)
-                print(segm.shape)
+                # imgs = np.concatenate((l_img, r_img, depth, segm), axis=-1)
+                # pca, imgs_rep = self.PCA(imgs)
+                # print("imgs_rep_shape: ", imgs_rep.shape)
+                # state_rep = np.concatenate((imgs_rep, pose_drill), axis=-1)
 
+                state_rep = []
                 if "voxel_removed" in file["voxels_removed"]:
                     voxel_time_stamp = file["voxels_removed"]["time_stamp"][()]
-                    print(voxel_time_stamp.shape)
-                    voxel_removed = file["voxels_removed"]["voxel_removed"][()]
+                    # voxel_removed = file["voxels_removed"]["voxel_removed"][()]
                     voxel_color = file["voxels_removed"]["voxel_color"][()]
+
                 else:
-                    voxel_removed = []
+                    # voxel_removed = []
                     voxel_color = []
                     voxel_time_stamp = []
-
-                data_states = {"l_img": l_img, "r_img": r_img, "depth": depth, "segm": segm, "pose_cam": pose_cam,
-                               "pose_drill": pose_drill, "voxel_removed": voxel_removed, "voxel_color": voxel_color,
-                               "time": time, "voxel_time_stamp": voxel_time_stamp}
-
-                cam_change = pose_cam[1:] - pose_cam[:-1]
-                drill_change = pose_drill[1:] - pose_drill[:-1]
-                data_actions = {"cam_change": cam_change, "drill_change": drill_change}
-
-                return data_actions, data_states
+                rewards, cum_rewards = self.color_pres(voxel_color, voxel_time_stamp, time)
+                #state_rep = np.concatenate((imgs_rep, cum_rewards), axis=-1)
+                # cam_change = np.concatenate((pose_cam[0].reshape(pose_cam[0].shape + (1,)), pose_cam[1:] - pose_cam[:-1]), axis=0)
+                drill_change = np.concatenate((pose_drill[0].reshape(pose_drill[0].shape + (1,)), pose_drill[1:] - pose_drill[:-1]), axis=0)
+                print(drill_change.shape)
+                # action_rep = np.concatenate((cam_change.reshape(cam_change.shape[0], -1),
+                #                                 drill_change.reshape(cam_change.shape[0], -1)), axis=-1)
+                data = {"time": time, "state_rep": state_rep, "action_rep": drill_change, "reward": rewards, "l_img": l_img, "r_img": r_img}
+                return data
             else:
-                return {}, {}
+                return {}
 
-    def next_batch(self):
-        if self.data_index == 0:
-            if self.file_index >= len(self.files_list) - 1:
-                return False
-            self.file_index += 1
-            self.data_actions, self.data_states = self.preprocess(self.files_list[self.file_index])
-            if len(self.data_actions.keys()) == 0:
-                return self.next_batch()
+    def process_data(self):
+        data = []
+        rewards = []
+        for file in self.files_list:
+            data_file = self.process_file(file)
+            rewards.append(np.sum(data_file["reward"]))
+            data.append(data_file)
 
-        batch_actions = {}
-        batch_states = {}
-        for key, value in self.data_actions.items():
-            batch_actions[key] = value[self.data_index:self.data_index + self.batch_size]
-        for key, value in self.data_states.items():
-            batch_states[key] = value[self.data_index:self.data_index + self.batch_size]
-        self.data_index += self.batch_size
-        if self.data_index >= len(self.data_states["l_img"]) - 1:
-            self.data_index = 0
-        return batch_actions, batch_states
-
+        data = [d for _, d in sorted(zip(rewards, data))]
+        return data, sorted(rewards)
 
     def PCA(self, image_array):
-        # image_array = image_array.reshape(image_array.shape[0], image_array)
+        image_array = image_array.reshape(image_array.shape[0], -1)
         pca = PCA(self.image_compression_dim)
         image_transformed = pca.fit_transform(image_array)
-        print(image_transformed.shape)
         return pca, image_transformed
 
-
+    def color_pres(self, voxel_color, time_stamps, times):
+        # freq = np.zeros(self.num_colors)
+        # color_pres = np.zeros(len(times), self.num_colors)
+        rewards = np.zeros(len(times))
+        reward = 0
+        cum_rewards = np.zeros(len(times))
+        for time_stamp, color in zip(time_stamps, voxel_color):
+            if color not in self.color_dict:
+                self.color_idx += 1
+                print(self.color_idx)
+                self.color_dict[self.color_idx] = color
+                # reward += self.reward_map[color]
+                reward += self.reward_list[self.color_idx]
+                # freq[self.color_idx] += 1
+            try:
+                idx = times.index(time_stamp)
+                print("color_idx", idx)
+                rewards[idx] = reward
+                if idx != 0:
+                    cum_rewards[idx] = cum_rewards[idx - 1] + reward
+                else:
+                    cum_rewards[idx] = reward
+            except:
+                pass
+        return rewards, cum_rewards
 
