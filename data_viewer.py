@@ -4,6 +4,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 
+from scipy.spatial.transform import Rotation as R
 
 def pose_to_matrix(pose):
     quat_norm = np.linalg.norm(pose[:, 3:], axis=-1)
