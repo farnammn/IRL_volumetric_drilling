@@ -8,6 +8,6 @@ file_list = [
     "20220407_171928.hdf5"
 ]
 
-data_set = DataSet(file_list)
+data_set = DataSet(file_list, 100)
 data_set.next_batch()
 
