@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 from scipy.spatial.transform import Rotation as R
+from sklearn.decomposition import PCA
 
 
 def pose_to_matrix(pose):
@@ -19,7 +20,7 @@ def pose_to_matrix(pose):
     return tau
 
 class DataSet:
-    def __init__(self, files_list, init_trajectory="./data/", batch_size=64):
+    def __init__(self, files_list, image_compression_dim, images_dim=(480, 640, 3), init_trajectory="./data/", batch_size=64):
         random.shuffle(files_list)
         self.files_list = files_list
         self.init_trajectory = init_trajectory
@@ -29,6 +30,8 @@ class DataSet:
         self.N = len(self.files_list)
         self.data_states = {}
         self.data_actions = {}
+        self.state_keys = ["l_img", "r_img", "depth", "segm", "pose_cam", "pose_drill"]
+        self.image_compression_dim = image_compression_dim
 
 
     def plot(self, l_img, r_img, depth, segm):
@@ -55,23 +58,28 @@ class DataSet:
                 pose_cam = np.matmul(pose_cam, np.linalg.inv(extrinsic)[None])
                 time = file["data"]["time"][()]
                 l_img = file["data"]["l_img"][()]
+                print(self.pca(l_img)[1])
                 r_img = file["data"]["r_img"][()]
                 depth = file["data"]["depth"][()]
                 segm = file["data"]["segm"][()]
                 pose_drill = pose_to_matrix(file['data']['pose_mastoidectomy_drill'][()])
                 print(l_img[0].shape)
+                print(depth[0].shape)
+                print(segm.shape)
 
                 if "voxel_removed" in file["voxels_removed"]:
-                    print(file["voxels_removed"]["time_stamp"][()])
+                    voxel_time_stamp = file["voxels_removed"]["time_stamp"][()]
+                    print(voxel_time_stamp.shape)
                     voxel_removed = file["voxels_removed"]["voxel_removed"][()]
                     voxel_color = file["voxels_removed"]["voxel_color"][()]
                 else:
                     voxel_removed = []
                     voxel_color = []
+                    voxel_time_stamp = []
 
                 data_states = {"l_img": l_img, "r_img": r_img, "depth": depth, "segm": segm, "pose_cam": pose_cam,
                                "pose_drill": pose_drill, "voxel_removed": voxel_removed, "voxel_color": voxel_color,
-                               "time": time}
+                               "time": time, "voxel_time_stamp": voxel_time_stamp}
 
                 cam_change = pose_cam[1:] - pose_cam[:-1]
                 drill_change = pose_drill[1:] - pose_drill[:-1]
@@ -101,6 +109,13 @@ class DataSet:
             self.data_index = 0
         return batch_actions, batch_states
 
+
+    def PCA(self, image_array):
+        # image_array = image_array.reshape(image_array.shape[0], image_array)
+        pca = PCA(self.image_compression_dim)
+        image_transformed = pca.fit_transform(image_array)
+        print(image_transformed.shape)
+        return pca, image_transformed
 
 
 
