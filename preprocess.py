@@ -6,6 +6,7 @@ import numpy as np
 import random
 from scipy.spatial.transform import Rotation as R
 from sklearn.decomposition import PCA
+from bisect import bisect_left
 
 
 def pose_to_matrix(pose):
@@ -21,7 +22,7 @@ def pose_to_matrix(pose):
 
 class DataSet:
     def __init__(self, files_list, config):
-        self.image_dim = config.images_dim
+        self.image_dim = config.image_dim
         self.files_list = files_list
         self.init_trajectory = config.init_trajectory
         self.batch_size = config.batch_size
@@ -33,8 +34,8 @@ class DataSet:
         self.image_compression_dim = config.image_compression_dim
         self.num_colors = 5
         self.color_dict = []
-        self.color_idx = -1
-        self.reward_map = config.reward_map
+        self.color_idx = 0
+        # self.reward_map = config.reward_map
         self.reward_list = [1, 2, 3, 4, 5]
 
     def plot(self, l_img, r_img, depth, segm):
@@ -49,7 +50,6 @@ class DataSet:
 
         plt.show()
 
-
     def process_file(self, file_name):
         file = h5py.File(self.init_trajectory + file_name, 'r')
 
@@ -60,10 +60,7 @@ class DataSet:
                 # pose_cam = pose_to_matrix(file['data']['pose_main_camera'][()])
                 # pose_cam = np.matmul(pose_cam, np.linalg.inv(extrinsic)[None])
                 # pose_cam = pose_cam.reshape(pose_cam.shape[0], -1)
-                pose_drill = pose_to_matrix(file['data']['pose_mastoidectomy_drill'][()])
-                print(file['data']['pose_mastoidectomy_drill'][()][0])
-                pose_drill = pose_drill.reshape(pose_drill.shape[0], -1)
-                print(pose_drill[0])
+                pose_drill = file['data']['pose_mastoidectomy_drill'][()]
                 time = file["data"]["time"][()]
                 l_img = file["data"]["l_img"][()]
                 r_img = file["data"]["r_img"][()]
@@ -88,8 +85,7 @@ class DataSet:
                 rewards, cum_rewards = self.color_pres(voxel_color, voxel_time_stamp, time)
                 #state_rep = np.concatenate((imgs_rep, cum_rewards), axis=-1)
                 # cam_change = np.concatenate((pose_cam[0].reshape(pose_cam[0].shape + (1,)), pose_cam[1:] - pose_cam[:-1]), axis=0)
-                drill_change = np.concatenate((pose_drill[0].reshape(pose_drill[0].shape + (1,)), pose_drill[1:] - pose_drill[:-1]), axis=0)
-                print(drill_change.shape)
+                drill_change = np.concatenate((pose_drill[0].reshape((1,)+ pose_drill[0].shape), pose_drill[1:] - pose_drill[:-1]), axis=0)
                 # action_rep = np.concatenate((cam_change.reshape(cam_change.shape[0], -1),
                 #                                 drill_change.reshape(cam_change.shape[0], -1)), axis=-1)
                 data = {"time": time, "state_rep": state_rep, "action_rep": drill_change, "reward": rewards, "l_img": l_img, "r_img": r_img}
@@ -102,10 +98,11 @@ class DataSet:
         rewards = []
         for file in self.files_list:
             data_file = self.process_file(file)
-            rewards.append(np.sum(data_file["reward"]))
-            data.append(data_file)
+            if len(data_file.keys()) != 0:
+                rewards.append(np.sum(data_file["reward"]))
+                data.append(data_file)
 
-        data = [d for _, d in sorted(zip(rewards, data))]
+        data = [d for _, d in sorted(zip(rewards, data), key=lambda pair: pair[0])]
         return data, sorted(rewards)
 
     def PCA(self, image_array):
@@ -121,22 +118,23 @@ class DataSet:
         reward = 0
         cum_rewards = np.zeros(len(times))
         for time_stamp, color in zip(time_stamps, voxel_color):
-            if color not in self.color_dict:
-                self.color_idx += 1
-                print(self.color_idx)
-                self.color_dict[self.color_idx] = color
-                # reward += self.reward_map[color]
-                reward += self.reward_list[self.color_idx]
-                # freq[self.color_idx] += 1
+
             try:
-                idx = times.index(time_stamp)
-                print("color_idx", idx)
+                idx = [np.array_equal(color,x) for x in self.color_dict].index(True)
+                reward = self.reward_list[idx]
+            except:
+                self.color_dict.append(color)
+                reward = self.reward_list[self.color_idx]
+                self.color_idx += 1
+                # freq[self.color_idx] += 1
+
+            idx = bisect_left(times, time_stamp)
+            if idx:
                 rewards[idx] = reward
                 if idx != 0:
                     cum_rewards[idx] = cum_rewards[idx - 1] + reward
                 else:
                     cum_rewards[idx] = reward
-            except:
-                pass
+
         return rewards, cum_rewards
 
