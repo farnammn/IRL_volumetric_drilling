@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-
+import os
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,10 +21,11 @@ def pose_to_matrix(pose):
     return tau
 
 class DataSet:
-    def __init__(self, files_list, config):
+    def __init__(self, config):
         self.image_dim = config.image_dim
-        self.files_list = files_list
         self.init_trajectory = config.init_trajectory
+        self.files_list = os.listdir(config.init_trajectory)
+        print(self.files_list)
         self.batch_size = config.batch_size
         self.file_index = 0
         self.data_index = 0
@@ -37,6 +38,7 @@ class DataSet:
         self.color_idx = 0
         # self.reward_map = config.reward_map
         self.reward_list = [1, 2, 3, 4, 5]
+        self.segm_color = []
 
     def plot(self, l_img, r_img, depth, segm):
         plt.subplot(221)
@@ -60,6 +62,7 @@ class DataSet:
                 # pose_cam = pose_to_matrix(file['data']['pose_main_camera'][()])
                 # pose_cam = np.matmul(pose_cam, np.linalg.inv(extrinsic)[None])
                 # pose_cam = pose_cam.reshape(pose_cam.shape[0], -1)
+                print(file.keys())
                 pose_drill = file['data']['pose_mastoidectomy_drill'][()]
                 time = file["data"]["time"][()]
                 l_img = file["data"]["l_img"][()]
@@ -67,6 +70,15 @@ class DataSet:
                 depth = file["data"]["depth"][()]
                 depth = depth.reshape(depth.shape + (1,))
                 segm = file["data"]["segm"][()]
+                for seg in segm:
+                    try:
+                        idx = [np.array_equal(segm, x) for x in self.segm_color].index(True)
+                    except:
+                        self.segm_color.append(seg)
+                        print(self.segm_color)
+                        with open("colors.txt", "a") as f:
+                            f.write(segm)
+                            f.close()
                 # imgs = np.concatenate((l_img, r_img, depth, segm), axis=-1)
                 # pca, imgs_rep = self.PCA(imgs)
                 # print("imgs_rep_shape: ", imgs_rep.shape)
