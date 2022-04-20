@@ -25,20 +25,15 @@ class DataSet:
         self.image_dim = config.image_dim
         self.init_trajectory = config.init_trajectory
         self.files_list = os.listdir(config.init_trajectory)
-        print(self.files_list)
         self.batch_size = config.batch_size
-        self.file_index = 0
-        self.data_index = 0
-        self.N = len(self.files_list)
-        self.data = {}
+        self.data_list = []
+        self.time = 1e15
         # self.state_keys = ["l_img", "r_img", "depth", "segm", "pose_cam", "pose_drill"]
         self.image_compression_dim = config.image_compression_dim
-        self.num_colors = 5
         self.color_dict = []
         self.color_idx = 0
-        # self.reward_map = config.reward_map
-        self.reward_list = [1, 2, 3, 4, 5]
-        self.segm_color = []
+        self.reward_map = config.reward_map
+        self.sensitive_reward = config.sensitive_reward
 
     def plot(self, l_img, r_img, depth, segm):
         plt.subplot(221)
@@ -53,16 +48,19 @@ class DataSet:
         plt.show()
 
     def process_file(self, file_name):
-        file = h5py.File(self.init_trajectory + file_name, 'r')
+        try:
+            file = h5py.File(self.init_trajectory + file_name, 'r')
+        except:
+            print("File reading error")
+            return
 
-        # print(list(file['data']["l_img"][()]))
+
         if "data" in file.keys() and "metadata" in file.keys() and "voxels_removed" in file.keys():
-            if "l_img" in file["data"].keys():
+            if "l_img" in file["data"].keys() and "pose_mastoidectomy_drill" in file["data"].keys():
                 # extrinsic = file['metadata']['camera_extrinsic'][()]
                 # pose_cam = pose_to_matrix(file['data']['pose_main_camera'][()])
                 # pose_cam = np.matmul(pose_cam, np.linalg.inv(extrinsic)[None])
                 # pose_cam = pose_cam.reshape(pose_cam.shape[0], -1)
-                print(file.keys())
                 pose_drill = file['data']['pose_mastoidectomy_drill'][()]
                 time = file["data"]["time"][()]
                 l_img = file["data"]["l_img"][()]
@@ -70,52 +68,39 @@ class DataSet:
                 depth = file["data"]["depth"][()]
                 depth = depth.reshape(depth.shape + (1,))
                 segm = file["data"]["segm"][()]
-                for seg in segm:
-                    try:
-                        idx = [np.array_equal(segm, x) for x in self.segm_color].index(True)
-                    except:
-                        self.segm_color.append(seg)
-                        print(self.segm_color)
-                        with open("colors.txt", "a") as f:
-                            f.write(segm)
-                            f.close()
                 # imgs = np.concatenate((l_img, r_img, depth, segm), axis=-1)
                 # pca, imgs_rep = self.PCA(imgs)
                 # print("imgs_rep_shape: ", imgs_rep.shape)
                 # state_rep = np.concatenate((imgs_rep, pose_drill), axis=-1)
 
                 state_rep = []
-                if "voxel_removed" in file["voxels_removed"]:
+                if "time_stamp" in file["voxels_removed"] and "voxel_color" in file["voxels_removed"]:
                     voxel_time_stamp = file["voxels_removed"]["time_stamp"][()]
                     # voxel_removed = file["voxels_removed"]["voxel_removed"][()]
                     voxel_color = file["voxels_removed"]["voxel_color"][()]
-
                 else:
-                    # voxel_removed = []
                     voxel_color = []
                     voxel_time_stamp = []
-                rewards, cum_rewards = self.color_pres(voxel_color, voxel_time_stamp, time)
-                #state_rep = np.concatenate((imgs_rep, cum_rewards), axis=-1)
+                rewards = self.color_pres(voxel_color, voxel_time_stamp, time)
                 # cam_change = np.concatenate((pose_cam[0].reshape(pose_cam[0].shape + (1,)), pose_cam[1:] - pose_cam[:-1]), axis=0)
                 drill_change = np.concatenate((pose_drill[0].reshape((1,)+ pose_drill[0].shape), pose_drill[1:] - pose_drill[:-1]), axis=0)
                 # action_rep = np.concatenate((cam_change.reshape(cam_change.shape[0], -1),
                 #                                 drill_change.reshape(cam_change.shape[0], -1)), axis=-1)
                 data = {"time": time, "state_rep": state_rep, "action_rep": drill_change, "reward": rewards, "l_img": l_img, "r_img": r_img}
-                return data
-            else:
-                return {}
+                if time[0] < self.time:
+                    self.data_list.append(data)
+                else:
+                    print(len(self.data_list))
+                    data_2 = self.data_list[-1]
+                    for key in data_2:
+                        data_2[key] = np.concatenate((data_2[key], data[key]), axis=0)
+                    self.data_list[-1] = data_2
+                self.time = time[-1]
 
     def process_data(self):
-        data = []
-        rewards = []
         for file in self.files_list:
-            data_file = self.process_file(file)
-            if len(data_file.keys()) != 0:
-                rewards.append(np.sum(data_file["reward"]))
-                data.append(data_file)
-
-        data = [d for _, d in sorted(zip(rewards, data), key=lambda pair: pair[0])]
-        return data, sorted(rewards)
+            self.process_file(file)
+        return self.data_list
 
     def PCA(self, image_array):
         image_array = image_array.reshape(image_array.shape[0], -1)
@@ -130,23 +115,20 @@ class DataSet:
         reward = 0
         cum_rewards = np.zeros(len(times))
         for time_stamp, color in zip(time_stamps, voxel_color):
+            flag = False
+            for color2, r in self.reward_map:
+                if np.array_equal(color2, color):
 
-            try:
-                idx = [np.array_equal(color,x) for x in self.color_dict].index(True)
-                reward = self.reward_list[idx]
-            except:
-                self.color_dict.append(color)
-                reward = self.reward_list[self.color_idx]
-                self.color_idx += 1
-                # freq[self.color_idx] += 1
-
+                    reward = r
+                    flag = True
+                    break
+            if not flag:
+                reward = self.sensitive_reward
+                print(color)
             idx = bisect_left(times, time_stamp)
-            if idx:
-                rewards[idx] = reward
-                if idx != 0:
-                    cum_rewards[idx] = cum_rewards[idx - 1] + reward
-                else:
-                    cum_rewards[idx] = reward
+            if idx and idx < len(times):
+                if reward == 100:
 
-        return rewards, cum_rewards
+                rewards[idx] = reward
+        return rewards
 
