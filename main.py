@@ -22,7 +22,6 @@ kwargs = {
         ([255, 225, 214, 255], -10), #cream #sensitive area
         ([100,   0,   0, 255], -20), #red sensitive area
         ([0, 255, 149, 255], +100), #lightgrean target
-        # ([233, 0, 225, 255], +100), #purple target
         ([233, 0, 255, 255], +100), #purple target
     ],
     "sensitive_reward": -10,

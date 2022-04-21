@@ -7,6 +7,7 @@ import random
 from scipy.spatial.transform import Rotation as R
 from sklearn.decomposition import PCA
 from bisect import bisect_left
+from utils import get_time_str
 
 
 def pose_to_matrix(pose):
@@ -19,6 +20,18 @@ def pose_to_matrix(pose):
     tau[:, :3, -1] = t
 
     return tau
+
+def view_data(l_img, r_img, name):
+    plt.subplot(221)
+    plt.imshow(l_img)
+    plt.subplot(222)
+    plt.imshow(r_img)
+    # plt.subplot(223)
+    # plt.imshow(depth[i], vmax=1)
+    # plt.subplot(224)
+    # plt.imshow(segm[i])
+
+    plt.savefig("img_"+str(name)+ "_" + get_time_str()+".png")
 
 class DataSet:
     def __init__(self, config):
@@ -127,8 +140,6 @@ class DataSet:
                 print(color)
             idx = bisect_left(times, time_stamp)
             if idx and idx < len(times):
-                if reward == 100:
-
                 rewards[idx] = reward
         return rewards
 
