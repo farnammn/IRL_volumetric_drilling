@@ -76,12 +76,6 @@ def irl(data_list, config, is_rew_fix=True, w=None):
             record_online_data(data=mu[i], total_steps=total_steps, name="mu_"+str(i))
 
     plot_mu(config.log_dir, mu)
-    if is_rew_fix:
-        for i in range(10):
-            idx = random.randint(0, 10)
-            image = np.random.choice(data_list[idx]["l_img"], 1)
-            reward = torch.matmul(image, w[:config.state_dim])
-            plot_images(config.log_dir, image, reward, i)
 
 
 

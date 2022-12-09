@@ -31,7 +31,14 @@ config = Config()
 config.merge(kwargs)
 
 data_set = DataSet(config=config)
-data_list = data_set.process_data()
+data_list = data_set.return_data_list()
+
+####
+# list of trajectories
+# data_list = [data] * number of trajectories
+# data is each trajectory
+# data = {"state_rep" : , "action_rep": , "reward" : }
+####
+
 irl(data_list=data_list, config=config)
 
-# plot([(config.log_dir, "fixed"), ], "IRL_riskaware")

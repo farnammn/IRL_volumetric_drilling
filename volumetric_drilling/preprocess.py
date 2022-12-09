@@ -131,7 +131,6 @@ class DataSet:
             flag = False
             for color2, r in self.reward_map:
                 if np.array_equal(color2, color):
-
                     reward = r
                     flag = True
                     break
