@@ -1,9 +1,7 @@
-from preprocess import DataSet
+from volumetric_drilling.preprocess import DataSet
 from config import Config
 from irl import irl
 from utils import *
-from os import mkdir
-import torch
 
 kwargs = {
     "batch_size": 64,
