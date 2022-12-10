@@ -19,7 +19,7 @@ class Config:
         self.batch_size = 64,
         self.image_compression_dim = 200,
         self.img_dim = (480, 640),
-        self.init_trajectory = "./data/",
+        self.init_trajectory = "./256/",
 
     @property
     def eval_env(self):
