@@ -7,7 +7,7 @@ from os import mkdir
 import numpy as np
 from torch.autograd import Variable
 
-def irl(data_list, config, is_rew_fix=True, w=None):
+def irl(data_list, config, is_rew_fix=False, w=None):
     logger = get_logger(log_dir=config.log_dir, log_level=config.log_level)
 
     def record_online_data(data, name, total_steps, offset=0):
@@ -35,17 +35,22 @@ def irl(data_list, config, is_rew_fix=True, w=None):
         if is_rew_fix:
             optimizer = torch.optim.Adam([mu], lr=config.lr)
         if not is_rew_fix:
-            w = torch.rand(config.state_dim + config.action_dim)
+            w = torch.rand(config.state_dim + config.action_dim, dtype=torch.float64)
             optimizer = torch.optim.Adam([w, mu], lr=config.lr)
+            # maybe should be out of loop
         if not is_rew_fix:
             rewards = torch.zeros(len(data_list))
             VaRs = []
             for j, data in enumerate(data_list):
-                phi = torch.concat((data["state_rep"], data["actions_rep"]), dim=0)
+                # print(np.array(data["state_rep"]).shape)
+                # print(np.array(data["action_rep"]).shape)
+                # print(len(data["state_rep"]))
+                phi = torch.concat((torch.tensor(data["state_rep"]), torch.tensor(data["action_rep"])), dim=1)
                 rewards_temp = torch.matmul(phi, w)
-                VaRs[j] = torch.sum(rewards_temp)
+                # print(rewards_temp)
+                VaRs.append(torch.sum(rewards_temp))
 
-                rewards_temp = rewards_temp.multinomial(num_samples=config.batch_size, replacement=False)
+                # rewards_temp = rewards_temp.multinomial(num_samples=config.batch_size, replacement=False)
                 rewards[j] = torch.sum(rewards_temp) / len(rewards_temp)
             data_list = [data for _, data in sorted(zip(VaRs, data_list), key=lambda pair: pair[0])]
             rewards = [reward for _, reward in sorted(zip(VaRs, rewards), key=lambda pair: pair[0])]
@@ -53,11 +58,18 @@ def irl(data_list, config, is_rew_fix=True, w=None):
         for j, data in enumerate(data_list):
             for i, var in enumerate(VaRs[:(j+1)]):
                 if is_rew_fix:
-                    rewards = np.random.choice(data["reward"],len(data["reward"]))
+                    # rewards = np.random.choice(data["reward"], config.batch_size)
+                    print("kire khar")
+                    rewards = data["reward"]
                 if len(data["state_rep"]) > 0:
                     v = var / len(data["state_rep"])
                 else:
                     v = 0
+                # print(mu[i])
+                # print(j)
+                # print(len(data_list))
+                # print(rewards[j])
+
                 loss += mu[i] * (rewards[j] - v) / (len(data_list) - i + 1)
 
 
