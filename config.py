@@ -1,6 +1,6 @@
 import argparse
-import torch
-import gym
+# import torch
+# import gym
 
 # https://github.com/ShangtongZhang/DeepRL/blob/master/deep_rl/utils/config.py
 class Config:
@@ -16,22 +16,22 @@ class Config:
         self.log_level = 0
         self.tag = 'vanilla'
         self.tasks = False
-        self.batch_size = 64,
-        self.image_compression_dim = 200,
-        self.img_dim = (480, 640),
-        self.init_trajectory = "./data/",
+        self.batch_size = 64
+        self.init_trajectory = "./data/"
 
-    @property
-    def eval_env(self):
-        return self.__eval_env
 
-    @eval_env.setter
-    def eval_env(self, env):
-        self.__eval_env = env
-        self.state_dim = env.state_dim
-        self.action_dim = env.action_dim
-        self.task_name = env.name
-        self.discrete = isinstance(env.action_space, gym.spaces.Discrete)
+
+    # @property
+    # def eval_env(self):
+    #     return self.__eval_env
+
+    # @eval_env.setter
+    # def eval_env(self, env):
+    #     self.__eval_env = env
+    #     self.state_dim = env.state_dim
+    #     self.action_dim = env.action_dim
+    #     self.task_name = env.name
+    #     self.discrete = isinstance(env.action_space, gym.spaces.Discrete)
 
     def add_argument(self, *args, **kwargs):
         self.parser.add_argument(*args, **kwargs)

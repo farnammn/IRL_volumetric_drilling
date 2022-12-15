@@ -1,6 +1,6 @@
 import torch
 import random
-from utils import plot_mu, plot_images
+# from utils import plot_mu, plot_images
 from logger import get_logger
 import os
 from os import mkdir
@@ -53,7 +53,7 @@ def irl(data_list, config, is_rew_fix=True, w=None):
         for j, data in enumerate(data_list):
             for i, var in enumerate(VaRs[:(j+1)]):
                 if is_rew_fix:
-                    rewards = np.random.choice(data["reward"], config.batch_size)
+                    rewards = np.random.choice(data["reward"],len(data["reward"]))
                 if len(data["state_rep"]) > 0:
                     v = var / len(data["state_rep"])
                 else:
@@ -75,7 +75,7 @@ def irl(data_list, config, is_rew_fix=True, w=None):
         for i in range(len(data_list)):
             record_online_data(data=mu[i], total_steps=total_steps, name="mu_"+str(i))
 
-    plot_mu(config.log_dir, mu)
+    # plot_mu(config.log_dir, mu)
 
 
 

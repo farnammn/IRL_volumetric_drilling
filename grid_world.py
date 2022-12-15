@@ -24,8 +24,7 @@ class GridWorld(gym.Env):
     """
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, width=8, length=8,
-                 r_remaining=-1):
+    def __init__(self, width=8, length=8):
         super(GridWorld, self).__init__()
 
         self.shape = [width, length]
@@ -93,15 +92,9 @@ class GridWorld(gym.Env):
             self.current_state_index = self.start_index
         else:
             self.current_state_index = new_state_index
-        return self.index_to_one_hat(self.current_state_index), self.rewards[cell_type], is_done, {}
-
-
-    def index_to_one_hat(self, index):
-        out = np.zeros(np.prod(self.shape))
-        out[index] = 1
-        return out
+        return self.current_state_index, self.rewards[cell_type], is_done, {}
 
     def reset(self):
         self.current_state_index = self.start_index
-        return self.index_to_one_hat(self.current_state_index)
+        return self.current_state_index
 
