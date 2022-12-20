@@ -143,7 +143,7 @@ def make_trajectory(state_sp, action_sp, cost_p, w_s=30):
     dict_tra["cost"] = traj_s
 
     return dict_tra
-trajectory_dictionary = make_trajectory(a, b, c, w_s=30)
+trajectory_dictionary = make_trajectory(a, b, c, w_s=100)
 with open(os.path.join(data_path,"data/" + 'data_traj.pickle'), 'wb') as handle:
     pickle.dump(trajectory_dictionary, handle)
 

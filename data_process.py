@@ -82,7 +82,7 @@ class SimDrivingSet(Dataset):
         a, b, c = self.creat_dataset(x_follower, vx_follower, ax_follower, x_leader, ay_follower, vy_follower, y_leader,
                                 y_follower, 0.0167, l)
 
-        self.data_list = self.make_trajectory(a, b, c, w_s=30)
+        self.data_list = self.make_trajectory(a, b, c, w_s=1)
 
 
     def return_data_list(self):
@@ -138,7 +138,7 @@ class SimDrivingSet(Dataset):
             action_space[1, i] = centers[k, 1]
         return action_space
 
-    def cost_f(self, x_f, y_f, theta_f, x_l, y_l, u_a, r_1=0.05, r_2=1., r_3=0.1, r_4=1.0, r_5=0.1, r_6=0.5):
+    def reward(self, x_f, y_f, theta_f, x_l, y_l, u_a, r_1=0.05, r_2=1., r_3=0.1, r_4=1.0, r_5=0.1, r_6=0.5):
         """
         calculate cost fucntion
         """
@@ -153,12 +153,12 @@ class SimDrivingSet(Dataset):
         f6 = (y_f > 2) * (np.log(1 + np.exp(r_6 * (y_f - 2.))) - np.log(2)) + (y_f < -2) * (
                     np.log(1 + np.exp(-r_6 * (y_f + 2.))) - np.log(2))
         f = f1 + f2 + f5 + f6
-        return f.reshape(1, -1)
+        return - f.reshape(1, -1)
 
     def creat_dataset(self, x_f, vx_f, ax_f, x_l, ay_f, vy_f, y_l, y_f, dt, l):
         state, action = self.create_state(x_f, vx_f, ax_f, x_l, ay_f, vy_f, y_l, y_f, dt, l)
         action = self.descretize(action, n_c=15)
-        cost_p = self.cost_f(state[0, :], state[1, :], state[2, :], state[1, :], state[1, :], action[0, :], r_1=0.05, r_2=1.,
+        cost_p = self.reward(state[0, :], state[1, :], state[2, :], state[1, :], state[1, :], action[0, :], r_1=0.05, r_2=1.,
                         r_3=0.1, r_4=1.0, r_5=0.1, r_6=0.5)
         return state, action, cost_p
 
@@ -189,7 +189,7 @@ class SimDrivingSet(Dataset):
         dict_tra = {}
         dict_tra["state_rep"] = traj_s[:, :, 0]
         dict_tra["action_rep"] = traj_s[:, :, 0]
-        dict_tra["cost"] = np.average(traj_s, dim=-1)
+        dict_tra["cost"] = np.average(traj_c,axis=-1)
 
         return dict_tra
 

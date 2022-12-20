@@ -13,13 +13,15 @@ kwargs = {
     "action_dim": 4,
     "lr": 0.01,
     "num_steps": 30000,
-    "log_dir": "./exp/" + get_time_str() + "/",
+
     "is_rew_fix": False,
     "sensitive_reward": -10,
     "num_traj": 100,
     "env_id": "gridWorld",
     "env_width": 8,
-    "env_length": 8
+    "env_length": 8,
+    "driving_l": 3.47,
+    "log_dir": "./exp/" + get_time_str() + "/",
 }
 
 mkdirs(kwargs["log_dir"])
@@ -28,9 +30,13 @@ kwargs.setdefault('log_level', 0)
 config = Config()
 config.merge(kwargs)
 
-data_set = GymSet(config)
-# data_set = SimDrivingSet(config)
+# data_set = GymSet(config)
+data_set = SimDrivingSet(config)
+
+
 data_list = data_set.return_data_list()
+print(type(data_list))
+exit()
 
 ####
 # list of trajectories
