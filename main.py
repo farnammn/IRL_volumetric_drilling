@@ -1,5 +1,5 @@
 from config import Config
-from irl import irl
+from irl import irl, irl_dr
 from utils import *
 from data_process import GymSet
 from data_process import SimDrivingSet
@@ -35,8 +35,9 @@ data_set = SimDrivingSet(config)
 
 
 data_list = data_set.return_data_list()
-print(type(data_list))
-exit()
+
+
+
 
 ####
 # list of trajectories
@@ -45,5 +46,6 @@ exit()
 # data = {"state_rep" : , "action_rep": , "reward" : }
 ####
 
-irl(data_list=data_list, config=config)
+# irl(data_list=data_list, config=config)
+irl_dr(data_list=data_list, config=config)
 

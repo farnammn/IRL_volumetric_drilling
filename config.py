@@ -18,6 +18,8 @@ class Config:
         self.tasks = False
         self.batch_size = 64
         self.init_trajectory = "./data/"
+        self.state_dim = 5
+        self.action_dim = 2
 
 
 

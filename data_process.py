@@ -16,8 +16,6 @@ class Dataset(ABC):
         pass
 
 
-
-
 class GymSet(Dataset):
     def __init__(self, config):
         if config.env_id == "gridWorld":
@@ -33,10 +31,10 @@ class GymSet(Dataset):
     def run_env(self):
         for _ in range(self.num_traj):
             done = False
-            data = {"state_rep":[], "action_rep":[], "reward":[]}
+            data = {"state_rep": [], "action_rep": [], "reward": []}
             state = self.reset()
 
-            while(not done):
+            while (not done):
                 action = self.expert_policy[state]
                 data["state_rep"].append(self.index_to_one_hat(state, self.state_dim))
                 data["action_rep"].append(self.index_to_one_hat(action, self.action_dim))
@@ -52,7 +50,6 @@ class GymSet(Dataset):
     def compute_expert_policy(self):
         return np.random.randint(self.action_dim, size=self.state_dim)
 
-
     def reset(self):
         return self.env.reset()
 
@@ -62,31 +59,58 @@ class GymSet(Dataset):
 
 class SimDrivingSet(Dataset):
     def __init__(self, config):
-        def load_data(main_path, file_path):
-            return loadmat(os.path.join(data_path, "data/" + file_path))
 
-        data_path = Path(__file__).resolve().parent
 
-        data_processed = load_data(data_path, "human_robot_data_p1_train.mat")
-        l = config.driving_l
-        x_follower = data_processed["x_f"]
-        vx_follower = data_processed["vx_f"]
-        ax_follower = data_processed["ax_f"]
-        x_leader = data_processed["x_l"]
-        ay_follower = data_processed["ay_f"]
-        vy_follower = data_processed["vy_f"]
-        y_leader = data_processed["x_f"]
-        y_follower = data_processed["y_f"]
-        dt = data_processed["dt"]
+        self.data_path = Path(__file__).resolve().parent
 
-        a, b, c = self.creat_dataset(x_follower, vx_follower, ax_follower, x_leader, ay_follower, vy_follower, y_leader,
-                                y_follower, 0.0167, l)
-
-        self.data_list = self.make_trajectory(a, b, c, w_s=1)
-
+        # data_processed = load_data(data_path, "human_robot_data_p1_train.mat")
+        self.l = config.driving_l
+        # x_follower = data_processed["x_f"]
+        # vx_follower = data_processed["vx_f"]
+        # ax_follower = data_processed["ax_f"]
+        # x_leader = data_processed["x_l"]
+        # ay_follower = data_processed["ay_f"]
+        # vy_follower = data_processed["vy_f"]
+        # y_leader = data_processed["x_f"]
+        # y_follower = data_processed["y_f"]
+        # dt = data_processed["dt"]
+        #
+        # a, b, c = self.creat_dataset(x_follower, vx_follower, ax_follower, x_leader, ay_follower, vy_follower, y_leader,
+        #                              y_follower, 0.0167, l)
+        #
+        # self.data_list = self.make_trajectory(a, b, c, w_s=1)
 
     def return_data_list(self):
-        self.data_list
+        d_list = []
+        raw_list = self.list_path(self.data_path)
+        for data_processed in raw_list:
+            x_follower = data_processed["x_f"]
+            vx_follower = data_processed["vx_f"]
+            ax_follower = data_processed["ax_f"]
+            x_leader = data_processed["x_l"]
+            ay_follower = data_processed["ay_f"]
+            vy_follower = data_processed["vy_f"]
+            y_leader = data_processed["x_f"]
+            y_follower = data_processed["y_f"]
+            dt = data_processed["dt"]
+            a, b, c = self.creat_dataset(x_follower, vx_follower, ax_follower, x_leader, ay_follower, vy_follower,
+                                         y_leader, y_follower, 0.0167, self.l)
+            d_list.append(self.make_trajectory(a, b, c, w_s=1))
+        return d_list
+
+    def list_path(self, main_path):
+        data_process_list = []
+        listpath = []
+        for i in range(10):
+            listpath.append("human_robot_data_p" + str(i+1) + "_train.mat")
+        for file_path in listpath:
+            data_process_list.append(loadmat(os.path.join(main_path, "data/" + file_path)))
+        return data_process_list
+
+
+
+
+
 
     def create_state(self, x_f, vx_f, ax_f, x_l, ay_f, vy_f, y_l, y_f, dt, l):
         """
@@ -130,7 +154,7 @@ class SimDrivingSet(Dataset):
         aux = copy.deepcopy(action_space)
         kmeans = KMeans(n_clusters=n_c, random_state=0).fit(aux.reshape(-1, 2))
         centers = kmeans.cluster_centers_
-        print(centers.shape)
+
         lab = kmeans.labels_
         for i in range(lab.shape[0]):
             k = lab[i]
@@ -151,18 +175,17 @@ class SimDrivingSet(Dataset):
         #     f4 =
         f5 = np.log(1 + np.exp(r_5 * np.abs(y_rel))) - np.log(2)
         f6 = (y_f > 2) * (np.log(1 + np.exp(r_6 * (y_f - 2.))) - np.log(2)) + (y_f < -2) * (
-                    np.log(1 + np.exp(-r_6 * (y_f + 2.))) - np.log(2))
+                np.log(1 + np.exp(-r_6 * (y_f + 2.))) - np.log(2))
         f = f1 + f2 + f5 + f6
         return - f.reshape(1, -1)
 
     def creat_dataset(self, x_f, vx_f, ax_f, x_l, ay_f, vy_f, y_l, y_f, dt, l):
         state, action = self.create_state(x_f, vx_f, ax_f, x_l, ay_f, vy_f, y_l, y_f, dt, l)
         action = self.descretize(action, n_c=15)
-        cost_p = self.reward(state[0, :], state[1, :], state[2, :], state[1, :], state[1, :], action[0, :], r_1=0.05, r_2=1.,
-                        r_3=0.1, r_4=1.0, r_5=0.1, r_6=0.5)
+        cost_p = self.reward(state[0, :], state[1, :], state[2, :], state[1, :], state[1, :], action[0, :], r_1=0.05,
+                             r_2=1.,
+                             r_3=0.1, r_4=1.0, r_5=0.1, r_6=0.5)
         return state, action, cost_p
-
-
 
     # Building trajectory
     # chunk the wole data to different trajectories
@@ -186,10 +209,18 @@ class SimDrivingSet(Dataset):
                 traj_s = np.concatenate((traj_s, tr_s), axis=0)
                 traj_a = np.concatenate((traj_a, tr_a), axis=0)
                 traj_c = np.concatenate((traj_c, tr_c), axis=0)
+
+        # reshape state, action and reward n_traj, lentgh, n_state
+        st_sh = traj_s.shape
+        ac_sh = traj_a.shape
+        re_sh = traj_c.shape
+        traj_s = traj_s.reshape((-1, st_sh[2], st_sh[1]))
+        traj_a = traj_a.reshape((-1, ac_sh[2], ac_sh[1]))
+        traj_c = traj_c.reshape((-1, re_sh[2], re_sh[1]))
         dict_tra = {}
-        dict_tra["state_rep"] = traj_s[:, :, 0]
-        dict_tra["action_rep"] = traj_s[:, :, 0]
-        dict_tra["cost"] = np.average(traj_c,axis=-1)
+        dict_tra["state_rep"] = traj_s[:, 0, :]
+        dict_tra["action_rep"] = traj_a[:, 0, :]
+        dict_tra["reward"] = np.average(traj_c, axis=-1)
+        # dict_tra["reward"] = traj_c[:, 0, :]
 
         return dict_tra
-
