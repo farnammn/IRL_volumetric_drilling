@@ -9,8 +9,8 @@ kwargs = {
     "image_compression_dim": 200,
     "image_dim": (480, 640),
     "init_trajectory": "./data/",
-    "state_dim": 64,
-    "action_dim": 4,
+    "state_dim": 5,
+    "action_dim": 2,
     "lr": 0.01,
     "num_steps": 30000,
 

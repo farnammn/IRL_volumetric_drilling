@@ -172,7 +172,7 @@ def irl_dr(data_list, config, is_rew_fix=False, w=None):
         mu.requires_grad = True
         record_online_data(data=loss, total_steps=total_steps, name="loss")
         if not is_rew_fix:
-            idxs = [-8, -7, -6]
+            idxs = [-5, -4, -3]
             for i, idx in enumerate(idxs):
                 record_online_data(data=w[idx], total_steps=total_steps, name="w_"+str(i))
         for i in range(len(data_list)):
